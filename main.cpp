@@ -3,6 +3,7 @@
 #define PI 3.1415926535
 #define P2 PI/2
 #define P3 3*PI/2
+#define DR 0.0174533 // Deg -> Rad
 
 // compatibility with original GLUT
 #if !defined(GLUT_WINDOW_SCALE)
@@ -36,20 +37,23 @@ void drawMap() {
 
     for (y = 0; y < mapY; y++) {
         for (x = 0; x < mapX; x++) {
-            if (map[y * mapY + x])
+            if (map[y * mapY + x]) {
                 glColor3f(1, 1, 1);
-            else
+
+                xo = x * mapS;
+                yo = y * mapS;
+
+                glBegin(GL_QUADS);
+                glVertex2i(xo + 1, yo + 1);
+                glVertex2i(xo + 1, yo + mapS - 1);
+                glVertex2i(xo + mapS - 1, yo + mapS - 1);
+                glVertex2i(xo + mapS - 1, yo + 1);
+                glEnd();
+
+            } else
                 glColor3f(0, 0, 0);
 
-            xo = x * mapS;
-            yo = y * mapS;
 
-            glBegin(GL_QUADS);
-            glVertex2i(xo + 1, yo + 1);
-            glVertex2i(xo + 1, yo + mapS - 1);
-            glVertex2i(xo + mapS - 1, yo + mapS - 1);
-            glVertex2i(xo + mapS - 1, yo + 1);
-            glEnd();
         }
     }
 }
@@ -76,11 +80,26 @@ float dist(float ax, float ay, float bx, float by, float ang) {
 }
 
 void drawRays() {
-    int r, mx, my, mp, dof;
-    float rx, ry, ra, xo, yo, aTan, nTan, hx, hy, vx, vy;
+    // Floor
+    glColor3f(0.2, 0.5, 0.2);
+    glBegin(GL_QUADS);
+    glVertex2i(0, 300);
+    glVertex2i(0 + 800, 300);
+    glVertex2i(800, 600);
+    glVertex2i(0, 600);
+    glEnd();
 
-    ra = pa;
-    for (r = 0; r < 1; r++) {
+
+    // Rays
+    int r, mx, my, mp, dof;
+    float rx, ry, ra, xo, yo, aTan, nTan, hx, hy, vx, vy, disT;
+
+    ra = pa - DR * 30; // Angle from player
+    if (ra < 0)
+        ra += 2 * PI;
+    if (ra > 2 * PI)
+        ra -= 2 * PI;
+    for (r = 0; r < 60; r++) {
         // --- Check Horizontal Lines ---
         dof = 0;
         float disH = 100000000;
@@ -183,29 +202,68 @@ void drawRays() {
 
         // Check for shortest distance
         if (disV < disH) {
+            glColor3f(0.9, 0, 0);
+
             rx = vx;
             ry = vy;
+            disT = disV;
         }
         if (disH < disV) {
+            glColor3f(0.7, 0, 0);
+
             rx = hx;
             ry = hy;
+            disT = disH;
         }
 
         // Draw ray
-        glColor3f(1, 0, 0);
         glLineWidth(3);
         glBegin(GL_LINES);
         glVertex2i(px, py);
         glVertex2i(rx, ry);
         glEnd();
+
+        // --- Draw 2.5D ---
+        float ca = pa - ra; // Fix fish-eye
+        if (ca < 0)
+            ca += 2 * PI;
+        if (ca > 2 * PI)
+            ca -= 2 * PI;
+        disT = disT * cos(ca);
+
+        float lineH = (mapS * 600) / disT; // Line Height
+        if (lineH > 600) lineH = 600;
+        float lineO = 300 - lineH/2;
+
+        // Draw line x2
+        /*glLineWidth(8);
+        glBegin(GL_LINES);
+        glVertex2i(r * 8, lineO);
+        glVertex2i(r * 8, lineH + lineO);
+        glEnd(); */
+        int width = 16;
+        glBegin(GL_QUADS);
+        glVertex2i(r * width, lineO);
+        glVertex2i(r * width + width, lineO);
+        glVertex2i(r * width + width, lineH + lineO);
+        glVertex2i(r * width, lineH + lineO);
+        glEnd();
+
+
+        // Next ray
+        ra += DR;
+        if (ra < 0)
+            ra += 2 * PI;
+        if (ra > 2 * PI)
+            ra -= 2 * PI;
     }
 }
 
 void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    drawRays();
     drawMap();
     drawPlayer();
-    drawRays();
     glutSwapBuffers();
 }
 
@@ -255,7 +313,7 @@ void init() {
 int main(int argc, char* argv[]) {
     glutInit(&argc, argv);
     glutInitDisplayString("rgb double hidpi");
-    glutInitWindowSize(800, 800);
+    glutInitWindowSize(400, 300);
     glutCreateWindow("e2.5GL");
 
     init();
